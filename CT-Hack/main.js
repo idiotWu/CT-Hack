@@ -41,12 +41,6 @@ var init = {
     phone: undefined,
     NasType: 'Huawei',
     NasName: 'BJ-JA-SR-1.M.ME60', // BUCT 默认值
-    start: function(phone) {
-        // 开始模拟请求过程
-        init.phone = parseInt(phone, 10);
-        init.tryConnect(); // 异步获得网关信息
-        init.open(); // 开始伪造请求
-    },
     tryConnect: function(callback) {
         // 尝试连接，用于获取网关信息或测试网络连接
         // 那就愉快地异步了吧~
@@ -258,21 +252,21 @@ var hack = {
     }
 };
 
-function input() {
+(function() {
     // 从控制台得到输入的手机号
+    colorConsole('/*!\n* ChinaNet Portal Hacking v0.0.3 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n\n', 'yellow');
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
     process.stdout.write('请输入11位手机号: ');
     process.stdin.on('data', function(phone) {
         phone = phone.trim();
-        process.stdin.removeListener('data', arguments.callee);
         if (phone.length !== 11)
-            return colorConsole('手机号长度不对！\n', 'red'), input();
+            return colorConsole('手机号长度不对！\n', 'red'), process.stdout.write('请输入11位手机号: ');
         if (/[^\d]/g.test(phone))
-            return colorConsole('手机号格式不正确！\n', 'red'), input();
+            return colorConsole('手机号格式不正确！\n', 'red'), process.stdout.write('请输入11位手机号: ');
         process.stdin.pause();
-        init.start(phone);
+        init.phone = parseInt(phone, 10); // 存储手机号码
+        init.tryConnect(); // 异步获得网关信息
+        init.open(); // 开始伪造请求
     });
-};
-colorConsole('/*!\n* ChinaNet Portal Hacking v0.0.3 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing iphoneNumber in shell to run it;\n* Everything will be done automatically :)\n*/\n\n', 'yellow');
-input();
+}());
