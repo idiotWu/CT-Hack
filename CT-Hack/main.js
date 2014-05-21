@@ -74,7 +74,7 @@ var init = {
         // 发起请求，得到 cookie
         var path = '/service/index.jsp';
         var options = new opt(path);
-        colorConsole('开始发起请求\n', 'yellow');
+        colorConsole('-->\n开始发起请求\n', 'yellow');
         var req = http.get(options, function(res) {
             res.setEncoding('utf8');
             var cookie = res['headers']['set-cookie'][0].split(';')[0];
@@ -129,6 +129,8 @@ var hack = {
                     colorConsole('得到的订单号：' + orderId + '\n', 'cyan');
                     hack.getPwd(orderId); // 获取账号密码
                 } else {
+                    if (data.indexOf('购物车为空') !== -1)
+                        return init.tryConnect(), colorConsole('购物车为空，重新添加', 'magenta'); // 若没进行购物车添加，则返回重试
                     colorConsole(data.split(',')[1] + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
                     hack.getOrder(); // 获取数据出错则递增重试
                 }
@@ -250,15 +252,15 @@ var hack = {
         // 定时检测网络连接状态
         hack.checkNet(function(isOffLine) {
             if (!isOffLine)
-                setTimeout(hack.checkDelay, 1000); // 直到网络连接上 :)
+                setTimeout(hack.checkDelay, 1000);
         });
     }
 };
-
 process.on('message', function(status) {
     init.phone = status.phone;
     if (status.crashed) {
-        colorConsole('\n主进程已启动！\n\n开始检测网络连接', 'green');
+        colorConsole('\n主进程已重新启动！\n', 'yellow');
+        colorConsole('\n开始检测网络连接\n', 'green');
         hack.checkDelay();
     } else {
         init.tryConnect();
