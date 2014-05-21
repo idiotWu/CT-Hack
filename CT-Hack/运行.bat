@@ -1,5 +1,5 @@
 @echo off
-title 电信网关自动刷取 by Dolphin
+title ChinaNet Portal Hacking by Dolphin
 cd %~dp0
-node.exe main.js
+node mother.js
 cls
