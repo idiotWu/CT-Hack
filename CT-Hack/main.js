@@ -156,7 +156,6 @@ var linkStart = (function (httpPost, checkNet) {
         };
 
         httpPost(options, function (res, data) {
-            console.log(data);
             if (data[0] === '1') {
                 // 得到订单号，开始尝试登录
                 var orderId = data.split(',')[1];
@@ -242,7 +241,7 @@ var linkStart = (function (httpPost, checkNet) {
                     setTimeout(function () {
                         colorConsole('开始检查网络连接...\n', 'magenta');
                         checkNet(function (isOffline) {
-                            if (isOffline) openReq();
+                            if (isOffline) getOrder();
                         });
                     }, 480000); // 八分钟触发定时器
 
