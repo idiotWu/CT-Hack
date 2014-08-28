@@ -87,7 +87,10 @@ var linkStart = (function (httpPost, checkNet) {
 
         init.phone = init.phone || phone;
 
-        if (init.cookie) return addGood(); // 已存在 cookie 则直接进行下一步
+        if (init.cookie) {
+            colorConsole('已存在 cookie：' + init.cookie + '\n', 'cyan');
+            return addGood(); // 已存在 cookie 则直接进行下一步
+        }
 
         httpPost({
                 path: '/service/index.jsp'
@@ -164,8 +167,9 @@ var linkStart = (function (httpPost, checkNet) {
             } else {
                 if (data.indexOf('购物车为空') !== -1) {
                     // 若没进行购物车添加，则重新发起请求
-                    colorConsole('购物车为空，重新添加', 'magenta');
-                    return list();
+                    colorConsole('购物车为空，将重置 cookie 后再次尝试！', 'magenta');
+                    delete init.cookie;
+                    return openReq();
                 }
                 // 否则递增电话号码重试
                 colorConsole(data.split(',')[1] + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
@@ -173,7 +177,7 @@ var linkStart = (function (httpPost, checkNet) {
             }
         });
 
-        ++init.phone; // 为下次计算做准备
+        process.send(++init.phone); // 为下次计算做准备
     };
 
     var getPwd = function (orderId) {
@@ -273,21 +277,25 @@ var reconnect = (function (linkStart) {
     var count = 0;
 
     var connect = function () {
-        if (count > 10) {
+        if (count >= 10) {
             // 十次尝试失败退出进程
-            colorConsole('重连失败，进程即将退出');
+            colorConsole('重连失败，进程即将退出', 'red');
             process.exit();
         }
-        setTimeout(linkStart, count * 3000);
-        colorConsole(++count * 3 + '秒后尝试重连', 'red');
+        setTimeout(linkStart, ++count * 3000);
+        colorConsole(count * 3 + '秒后尝试重连', 'red');
     };
 
     return connect;
 })(linkStart);
 
 // 进程会话
-process.on('message', function (phone) {
-    linkStart(phone);
+process.on('message', function (curStatus) {
+    if (curStatus.crashed) {
+        colorConsole('\n主进程已重新启动！\n', 'yellow');
+    }
+
+    linkStart(curStatus.phone);
 }).on('uncaughtException', function (err) {
     // 异常抛出
     colorConsole('Uncaught Exception ' + err, 'red');
