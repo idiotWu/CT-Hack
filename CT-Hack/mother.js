@@ -1,5 +1,7 @@
 var input = process.stdin;
 var output = process.stdout;
+input.resume();
+input.setEncoding('utf8');
 
 var parseUrl = require('url');
 var http = require('http');
@@ -42,14 +44,14 @@ var isEmptyObj = function (obj) {
 var getRedirectUrl = function (url, cb) {
     // 获取重定向网址
     httpGet(url, function (res) {
-        var redirect = res.headers.location;
-        if (redirect) {
+        var statusCode = res.statusCode;
+        if (statusCode === 302) {
+            // 再次被重定向
+            var redirect = res.headers.location;
             redirect = redirect.replace('https', 'http');
-            if (redirect.indexOf('redirect') > -1) {
-                // 获取到的再次重定向地址如：https://wlan.ct10000.com/portal/Huawei.redirect?NasName=BJ-JA-SR-1.M.ME60
-                return getRedirectUrl(redirect, cb);
-            }
-            return cb(redirect);
+            return getRedirectUrl(redirect, cb);
+        } else if (statusCode === 200) {
+            return cb(url);
         }
         return cb(undefined);
     });
@@ -58,7 +60,7 @@ var getRedirectUrl = function (url, cb) {
 var getPortalInfo = function (cb) {
     // 获取登录表单
     getRedirectUrl('http://www.baidu.com', function (url) {
-        if (!url) {
+        if (!url || url === 'http://www.baidu.com') {
             console.log('未获取到表单（原因：没有得到重定向地址）'.red.bold);
             return cb(null);
         }
@@ -84,7 +86,7 @@ var getPortalInfo = function (cb) {
                 loginForm[name] = value;
             });
 
-            if (loginForm.postfix) {
+            if ('postfix' in loginForm) {
                 // 修正表单信息
                 loginForm.postfix = '@wlan.sh.chntel.com';
                 loginForm.address = 'sh';
@@ -94,6 +96,7 @@ var getPortalInfo = function (cb) {
                 console.log('未获取到表单，正在重试...'.red);
                 return getPortalInfo(cb);
             }
+
             console.log(table.toString().yellow);
             cb(loginForm);
         });
@@ -127,9 +130,6 @@ var connect = function () {
     console.log('正在拉取登录表单，请稍后...'.cyan);
 
     getPortalInfo(function (loginForm) {
-        input.resume();
-        input.setEncoding('utf8');
-
         if (!loginForm) {
             return;
         }
