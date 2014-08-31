@@ -21,7 +21,7 @@ var isNeedUpdate = function (latest) {
 
 (function () {
     input.resume();
-    output.write('当前版本：' + version);
+    output.write('当前版本： ' + version);
     output.write('\n\nGithub 上最新版本：');
     https.get(url, function (res) {
         res.setEncoding('utf8');

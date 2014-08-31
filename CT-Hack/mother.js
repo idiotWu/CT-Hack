@@ -3,8 +3,9 @@ var output = process.stdout;
 input.resume();
 input.setEncoding('utf8');
 
-var parseUrl = require('url');
 var http = require('http');
+var https = require('https');
+var parseUrl = require('url');
 var child = require('child_process');
 var colors = require('./node_modules/colors');
 var cherrio = require('./node_modules/cheerio');
@@ -13,13 +14,14 @@ var AsciiTable = require('./node_modules/ascii-table');
 var curStatus = {
     phone: undefined,
     crashed: false,
+    loginHost: undefined,
     loginPath: undefined,
-    loginForm: undefined
+    loginForm: null
 };
 
-var httpGet = function (url, cb) {
+var httpsGet = function (url, cb) {
     // 发起 GET 请求
-    var req = http.get(url, function (res) {
+    var req = https.get(url, function (res) {
         res.setEncoding('utf8');
         var data = '';
         res.on('data', function (chunk) {
@@ -30,7 +32,7 @@ var httpGet = function (url, cb) {
     });
 
     req.on('error', function (e) {
-        console.log('请求出错: ' + e.message + ',请检查网络连接\n'.red.bold);
+        console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
     });
 };
 
@@ -43,39 +45,54 @@ var isEmptyObj = function (obj) {
 
 var getRedirectUrl = function (url, cb) {
     // 获取重定向网址
-    httpGet(url, function (res) {
+    // callback: url(https)
+    var getStatus = function (res) {
         var statusCode = res.statusCode;
         if (statusCode === 302) {
             // 再次被重定向
             var redirect = res.headers.location;
-            redirect = redirect.replace('https', 'http');
             return getRedirectUrl(redirect, cb);
         } else if (statusCode === 200) {
+            // 直到打开网关为止
             return cb(url);
         }
         return cb(undefined);
-    });
+    };
+
+    if (url.indexOf('https') === -1) {
+        return http.get(url, getStatus).on('error', function (e) {
+            console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
+        });
+    };
+
+    httpsGet(url, getStatus);
 };
 
-var getPortalInfo = function (cb) {
+var getLoginForm = function (cb) {
     // 获取登录表单
+    // callback: object loginForm
     getRedirectUrl('http://www.baidu.com', function (url) {
         if (!url || url === 'http://www.baidu.com') {
-            console.log('未获取到表单（原因：没有得到重定向地址）'.red.bold);
+            console.log('未获取到表单（原因：没有得到网关地址）'.red.bold);
             return cb(null);
         }
 
-        var prefix = parseUrl.parse(url).pathname || '';
+        var table = new AsciiTable('LOGIN FORM');
+        table.setHeading('NAME', 'VALUE');
+
+        var urlInfo = parseUrl.parse(url);
+        var prefix = urlInfo.pathname || '/portal/';
         prefix = prefix.match(/\/.*\//)[0];
 
-        httpGet(url, function (res, data) {
+        var loginHost = curStatus.loginHost = urlInfo.host || 'wlan.ct10000.com'; // 登录 host
+        table.addRow('host', loginHost);
+
+        httpsGet(url, function (res, data) {
 
             var $ = cherrio.load(data);
             var loginForm = {};
-            var table = new AsciiTable('Login Form');
-            table.setHeading('NAME', 'VALUE');
 
-            var loginPath = prefix + $('#loginForm').attr('action');
+            var loginPath = prefix + $('#loginForm').attr('action'); // 从表单中获得登录 path
             curStatus.loginPath = loginPath;
             table.addRow('path', loginPath);
 
@@ -91,10 +108,11 @@ var getPortalInfo = function (cb) {
                 loginForm.postfix = '@wlan.sh.chntel.com';
                 loginForm.address = 'sh';
             }
+
             if (isEmptyObj(loginForm)) {
                 // 未获取到则重试
                 console.log('未获取到表单，正在重试...'.red);
-                return getPortalInfo(cb);
+                return getLoginForm(cb);
             }
 
             console.log(table.toString().yellow);
@@ -127,9 +145,9 @@ var connect = function () {
     console.log('/*!\n* ChinaNet Portal Hacking v0.2.0 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
     console.log('进程守护已启动！\n'.magenta.bold);
 
-    console.log('正在拉取登录表单，请稍后...'.cyan);
+    console.log('正在拉取登录表单，请稍后...');
 
-    getPortalInfo(function (loginForm) {
+    getLoginForm(function (loginForm) {
         if (!loginForm) {
             return;
         }

@@ -1,4 +1,5 @@
 var http = require('http');
+var https = require('https');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
 
@@ -27,6 +28,7 @@ var httpReq = (function (querystring, http) {
 
     var post = function (opt, cb) {
         // 发起 POST 请求
+        // callback: object response, string data
         var req = http.request(createOpt(opt), function (res) {
             res.setEncoding('utf8');
             var data = '';
@@ -48,6 +50,7 @@ var httpReq = (function (querystring, http) {
 
     var get = function (url, cb) {
         // 发起 GET 请求
+        // callback: object response, string data
         var req = http.get(url, function (res) {
             res.setEncoding('utf8');
             var data = '';
@@ -74,6 +77,7 @@ var linkStart = (function (httpReq) {
     var init = {
         cookie: undefined,
         phone: undefined,
+        loginHost: undefined,
         loginPath: undefined,
         loginForm: null
     };
@@ -84,6 +88,7 @@ var linkStart = (function (httpReq) {
         curStatus = curStatus || init; // 重新发起请求时直接从 init 获取数据
 
         init.phone = curStatus.phone;
+        init.loginHost = curStatus.loginHost;
         init.loginPath = curStatus.loginPath;
         init.loginForm = curStatus.loginForm;
 
@@ -207,6 +212,7 @@ var linkStart = (function (httpReq) {
 
         var checkNet = function (cb) {
             // 检测网络是否连接上
+            // callback: boolean isOnline
             httpReq.get('http://www.baidu.com', function (res) {
                 if (res.statusCode !== 200) {
                     colorConsole('网络断开，开始下一组尝试...\n', 'grey');
@@ -223,20 +229,50 @@ var linkStart = (function (httpReq) {
             // 登录
             colorConsole('开始登录...\n', 'yellow');
 
-            var options = {
-                host: 'wlan.ct10000.com',
-                path: init.loginPath,
-                contents: init.loginForm
-            };
-            options.contents.username = uname;
-            options.contents.password = pwd;
+            var contents = init.loginForm;
+            contents.username = uname;
+            contents.password = pwd;
 
-            httpReq.post(options, function (res, data) {
-                data = data.split(' ').join(''); // 去除空格
+            contents = querystring.stringify(contents);
+
+            var options = {
+                method: 'POST',
+                host: init.loginHost,
+                path: init.loginPath,
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Length': contents.length
+                }
+            };
+
+
+            var httpsPost = function (opt, contents, cb) {
+                // 发送 https POST 请求
+                var req = https.request(opt, function (res) {
+                    res.setEncoding('utf8');
+                    var data = '';
+                    res.on('data', function (chunk) {
+                        data += chunk;
+                    }).on('end', function () {
+                        cb(res, data);
+                    });
+                });
+
+                req.on('error', function (e) {
+                    colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
+                    reconnect();
+                });
+
+                req.write(contents); // 写入请求内容
+                req.end();
+            };
+
+            httpsPost(options, contents, function (res, data) {
+                data = data.replace(/\s/g, ''); // 去除空格
 
                 if (data.indexOf('("1"=="1")//登录成功' /* 登录成功会返回含有此字符串的网页*/ ) !== -1) {
 
-                    colorConsole('登录成功！十秒后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
+                    colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
 
                     isSecondTry = false; // 重置计数
 
@@ -247,7 +283,7 @@ var linkStart = (function (httpReq) {
                                 getOrder();
                             }
                         });
-                    }, 10000); // 八分钟触发定时器
+                    }, 480000); // 八分钟触发定时器
 
                 } else {
                     if (isSecondTry) {
@@ -298,6 +334,6 @@ process.on('message', function (curStatus) {
     linkStart(curStatus);
 }).on('uncaughtException', function (err) {
     // 异常抛出
-    colorConsole('Uncaught Exception ' + err.stack, 'red');
+    colorConsole(err.stack, 'red');
     process.exit();
 });
