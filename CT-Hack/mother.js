@@ -9,7 +9,7 @@ var parseUrl = require('url').parse;
 var child = require('child_process');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
-var parseXML = require('./node_modules/xml2js').parseString;
+var cheerio = require('./node_modules/cheerio');
 
 var curStatus = {
     phone: undefined,
@@ -22,7 +22,7 @@ Object.prototype.deepFind = function (path) {
     var result = this;
 
     for (var i = 0, max = paths.length; i < max; ++i) {
-        if (result[paths[i]] == undefined) {
+        if (!result[paths[i]]) {
             return undefined;
         } else {
             result = result[paths[i]];
@@ -63,12 +63,11 @@ var getLoginUrl = function (cb) {
                 // 得到的是一个 xml 文件
                 xml += chunk;
             }).on('end', function () {
-                parseXML(xml, function (err, result) {
-                    if (err) {
-                        return console.log(err.red.bold);
-                    }
-                    cb(result.deepFind('WISPAccessGatewayParam.Redirect.0.LoginURL.0'));
+                var $ = cheerio.load(xml, {
+                    xmlMode: true
                 });
+                var loginUrl = $('LoginURL').text();
+                cb(loginUrl);
             });
         }).on('error', function (e) {
             console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
@@ -97,7 +96,7 @@ var connect = function () {
 };
 
 (function () {
-    console.log('/*!\n* ChinaNet Portal Hacking v0.3.0 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
+    console.log('/*!\n* ChinaNet Portal Hacking v0.3.1 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
     console.log('进程守护已启动！\n'.magenta.bold);
 
     console.log('正在获取网关地址，请稍后...');

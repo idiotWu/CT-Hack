@@ -2,22 +2,7 @@ var http = require('http');
 var https = require('https');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
-var parseXML = require('./node_modules/xml2js').parseString;
-
-Object.prototype.deepFind = function (path) {
-    var paths = path.split('.');
-    var result = this;
-
-    for (var i = 0, max = paths.length; i < max; ++i) {
-        if (result[paths[i]] == undefined) {
-            return undefined;
-        } else {
-            result = result[paths[i]];
-        }
-    }
-
-    return result;
-};
+var cheerio = require('./node_modules/cheerio');
 
 var colorConsole = function (str, color) {
     // 彩色输出
@@ -234,38 +219,35 @@ var linkStart = (function (httpReq) {
         };
 
         var checkLogin = function (uname, pwd, xml) {
-            parseXML(xml, function (err, result) {
-                if (err) {
-                    return colorConsole(err, 'bold');
-                }
-
-                var loginStatus = result.deepFind('WISPAccessGatewayParam.AuthenticationReply.0.ResponseCode.0');
-
-                if (loginStatus && parseInt(loginStatus) === 50) {
-                    colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
-
-                    isSecondTry = false; // 重置计数
-
-                    setTimeout(function () {
-                        colorConsole('开始检查网络连接...\n', 'magenta');
-                        checkNet();
-                    }, 480000); // 八分钟触发定时器
-                } else {
-                    if (isSecondTry) {
-                        // 两次登录都失败就放弃吧
-                        colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
-                        isSecondTry = false; // 重置计数
-                        getOrder();
-                    } else {
-                        // 电信渣服务器可能不能即时处理分配到的账号密码
-                        colorConsole('登录失败，三秒后再次尝试登录...\n', 'magenta');
-                        setTimeout(function () {
-                            isSecondTry = true; // 标记第二次尝试
-                            login(uname, pwd);
-                        }, 3000);
-                    }
-                }
+            var $ = cheerio.load(xml, {
+                xmlMode: true
             });
+            var loginStatus = $('ResponseCode').text();
+
+            if (loginStatus && parseInt(loginStatus) === 50) {
+                colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
+
+                isSecondTry = false; // 重置计数
+
+                setTimeout(function () {
+                    colorConsole('开始检查网络连接...\n', 'magenta');
+                    checkNet();
+                }, 480000); // 八分钟触发定时器
+            } else {
+                if (isSecondTry) {
+                    // 两次登录都失败就放弃吧
+                    colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
+                    isSecondTry = false; // 重置计数
+                    getOrder();
+                } else {
+                    // 电信渣服务器可能不能即时处理分配到的账号密码
+                    colorConsole('登录失败，三秒后再次尝试登录...\n', 'magenta');
+                    setTimeout(function () {
+                        isSecondTry = true; // 标记第二次尝试
+                        login(uname, pwd);
+                    }, 3000);
+                }
+            }
         };
 
         var login = function (uname, pwd) {
@@ -281,8 +263,8 @@ var linkStart = (function (httpReq) {
 
             var options = {
                 method: 'POST',
-                host: init.deepFind('loginUrl.host'),
-                path: init.deepFind('loginUrl.path'),
+                host: init.loginUrl.host,
+                path: init.loginUrl.path,
                 headers: {
                     'User-Agent': 'CDMA+WLAN',
                     'Content-Type': 'application/x-www-form-urlencoded',
