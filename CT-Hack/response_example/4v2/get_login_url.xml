@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WISPAccessGatewayParam>
+    <Redirect>
+        <AbortLoginURL>
+            https://wlan.ct10000.com/portal/wispr.logoff?NasType=Huawei-NasName=BJ-JA-SR-1.M.ME60
+        </AbortLoginURL>
+        <AccessProcedure>1.0</AccessProcedure>
+        <LoginURL>
+            https://wlan.ct10000.com/portal/wispr.login?NasType=Huawei-NasName=BJ-JA-SR-1.M.ME60
+        </LoginURL>
+        <MessageType>100</MessageType>
+        <ResponseCode>0</ResponseCode>
+    </Redirect>
+</WISPAccessGatewayParam>

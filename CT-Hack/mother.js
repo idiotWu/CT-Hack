@@ -5,118 +5,73 @@ input.setEncoding('utf8');
 
 var http = require('http');
 var https = require('https');
-var parseUrl = require('url');
+var parseUrl = require('url').parse;
 var child = require('child_process');
+var querystring = require('querystring');
 var colors = require('./node_modules/colors');
-var cherrio = require('./node_modules/cheerio');
-var AsciiTable = require('./node_modules/ascii-table');
+var parseXML = require('./node_modules/xml2js').parseString;
 
 var curStatus = {
     phone: undefined,
     crashed: false,
-    loginHost: undefined,
-    loginPath: undefined,
-    loginForm: null
+    loginUrl: null
 };
 
-var httpsGet = function (url, cb) {
-    // 发起 GET 请求
-    var req = https.get(url, function (res) {
-        res.setEncoding('utf8');
-        var data = '';
-        res.on('data', function (chunk) {
-            data += chunk;
-        }).on('end', function () {
-            cb(res, data);
-        });
-    });
+Object.prototype.deepFind = function (path) {
+    var paths = path.split('.');
+    var result = this;
 
-    req.on('error', function (e) {
+    for (var i = 0, max = paths.length; i < max; ++i) {
+        if (result[paths[i]] == undefined) {
+            return undefined;
+        } else {
+            result = result[paths[i]];
+        }
+    }
+
+    return result;
+};
+
+var getRedirectUrl = function (cb) {
+    // callback: string redirectUrl
+    http.get('http://www.baidu.com', function (res) {
+        if (res.statusCode === 302) {
+            var redirectUrl = res.headers.location;
+            cb(redirectUrl);
+        } else {
+            console.log('没有获得网关地址，请检查网络连接'.red.bold);
+        }
+    }).on('error', function (e) {
         console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
     });
 };
 
-var isEmptyObj = function (obj) {
-    for (var key in obj) {
-        return false;
-    }
-    return true;
-};
-
-var getRedirectUrl = function (url, cb) {
-    // 获取重定向网址
-    // callback: url(https)
-    var getStatus = function (res) {
-        var statusCode = res.statusCode;
-        if (statusCode === 302) {
-            // 再次被重定向
-            var redirect = res.headers.location;
-            return getRedirectUrl(redirect, cb);
-        } else if (statusCode === 200) {
-            // 直到打开网关为止
-            return cb(url);
-        }
-        return cb(undefined);
-    };
-
-    if (url.indexOf('https') === -1) {
-        return http.get(url, getStatus).on('error', function (e) {
-            console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
-        });
-    };
-
-    httpsGet(url, getStatus);
-};
-
-var getLoginForm = function (cb) {
-    // 获取登录表单
-    // callback: object loginForm
-    getRedirectUrl('http://www.baidu.com', function (url) {
-        if (!url || url === 'http://www.baidu.com') {
-            console.log('未获取到表单（原因：没有得到网关地址）'.red.bold);
-            return cb(null);
-        }
-
-        var table = new AsciiTable('LOGIN FORM');
-        table.setHeading('NAME', 'VALUE');
-
-        var urlInfo = parseUrl.parse(url);
-        var prefix = urlInfo.pathname || '/portal/';
-        prefix = prefix.match(/\/.*\//)[0];
-
-        var loginHost = curStatus.loginHost = urlInfo.host || 'wlan.ct10000.com'; // 登录 host
-        table.addRow('host', loginHost);
-
-        httpsGet(url, function (res, data) {
-
-            var $ = cherrio.load(data);
-            var loginForm = {};
-
-            var loginPath = prefix + $('#loginForm').attr('action'); // 从表单中获得登录 path
-            curStatus.loginPath = loginPath;
-            table.addRow('path', loginPath);
-
-            $('#loginForm > input').each(function () {
-                var name = $(this).attr('name');
-                var value = $(this).attr('value');
-                table.addRow(name, value);
-                loginForm[name] = value;
+var getLoginUrl = function (cb) {
+    // callback: string loginUrl
+    getRedirectUrl(function (url) {
+        url = parseUrl(url);
+        https.get({
+            host: url.host,
+            path: url.path,
+            headers: {
+                'User-Agent': 'CDMA+WLAN'
+            }
+        }, function (res) {
+            res.setEncoding('utf8');
+            var xml = '';
+            res.on('data', function (chunk) {
+                // 得到的是一个 xml 文件
+                xml += chunk;
+            }).on('end', function () {
+                parseXML(xml, function (err, result) {
+                    if (err) {
+                        return console.log(err.red.bold);
+                    }
+                    cb(result.deepFind('WISPAccessGatewayParam.Redirect.0.LoginURL.0'));
+                });
             });
-
-            if ('postfix' in loginForm) {
-                // 修正表单信息
-                loginForm.postfix = '@wlan.sh.chntel.com';
-                loginForm.address = 'sh';
-            }
-
-            if (isEmptyObj(loginForm)) {
-                // 未获取到则重试
-                console.log('未获取到表单，正在重试...'.red);
-                return getLoginForm(cb);
-            }
-
-            console.log(table.toString().yellow);
-            cb(loginForm);
+        }).on('error', function (e) {
+            console.log(('请求出错: ' + e.message + ',请检查网络连接').red.bold);
         });
     });
 };
@@ -142,16 +97,16 @@ var connect = function () {
 };
 
 (function () {
-    console.log('/*!\n* ChinaNet Portal Hacking v0.2.0 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
+    console.log('/*!\n* ChinaNet Portal Hacking v0.3.0 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
     console.log('进程守护已启动！\n'.magenta.bold);
 
-    console.log('正在拉取登录表单，请稍后...');
+    console.log('正在获取网关地址，请稍后...');
 
-    getLoginForm(function (loginForm) {
-        if (!loginForm) {
-            return;
+    getLoginUrl(function (url) {
+        if (!url) {
+            return console.log('未能获取到网关地址，请检查网络连接'.red.bold);
         }
-        curStatus.loginForm = loginForm;
+        curStatus.loginUrl = parseUrl(url);
 
         output.write('\n请输入11位手机号: '.cyan.bold);
 

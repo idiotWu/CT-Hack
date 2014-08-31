@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WISPAccessGatewayParam xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://www.acmewisp.com/WISPAccessGatewa1549yParam.xsd">
+    <Redirect>
+        <AccessProcedure>1.0</AccessProcedure>
+        <AccessLocation>12</AccessLocation>
+        <LocationName>ACMEWISP,Gate_14_Terminal_C_of_Newark_Airport</LocationName>
+        <LoginURL>https://wlan.ct10000.com/login</LoginURL>
+        <AbortLoginURL>https://wlan.ct10000.com/login</AbortLoginURL>
+        <MessageType>100</MessageType>
+        <ResponseCode>0</ResponseCode>
+    </Redirect>
+</WISPAccessGatewayParam>

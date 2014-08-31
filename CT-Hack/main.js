@@ -2,6 +2,22 @@ var http = require('http');
 var https = require('https');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
+var parseXML = require('./node_modules/xml2js').parseString;
+
+Object.prototype.deepFind = function (path) {
+    var paths = path.split('.');
+    var result = this;
+
+    for (var i = 0, max = paths.length; i < max; ++i) {
+        if (result[paths[i]] == undefined) {
+            return undefined;
+        } else {
+            result = result[paths[i]];
+        }
+    }
+
+    return result;
+};
 
 var colorConsole = function (str, color) {
     // 彩色输出
@@ -14,7 +30,7 @@ var httpReq = (function (querystring, http) {
         var options = {
             method: 'POST',
             host: opt.host || 'wifi.189.cn',
-            path: opt.path || './',
+            path: opt.path || '/',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
                 'Content-Length': querystring.stringify(opt.contents).length
@@ -41,7 +57,6 @@ var httpReq = (function (querystring, http) {
 
         req.on('error', function (e) {
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
-            reconnect();
         });
 
         req.write(querystring.stringify(opt.contents)); // 写入请求内容
@@ -63,7 +78,6 @@ var httpReq = (function (querystring, http) {
 
         req.on('error', function (e) {
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
-            reconnect();
         });
     };
 
@@ -77,9 +91,7 @@ var linkStart = (function (httpReq) {
     var init = {
         cookie: undefined,
         phone: undefined,
-        loginHost: undefined,
-        loginPath: undefined,
-        loginForm: null
+        loginUrl: null
     };
 
     var openReq = function (curStatus) {
@@ -88,9 +100,7 @@ var linkStart = (function (httpReq) {
         curStatus = curStatus || init; // 重新发起请求时直接从 init 获取数据
 
         init.phone = curStatus.phone;
-        init.loginHost = curStatus.loginHost;
-        init.loginPath = curStatus.loginPath;
-        init.loginForm = curStatus.loginForm;
+        init.loginUrl = curStatus.loginUrl;
 
         if (init.cookie) {
             colorConsole('已存在 cookie：' + init.cookie + '\n', 'cyan');
@@ -195,7 +205,7 @@ var linkStart = (function (httpReq) {
         httpReq.post(options, function (res, data) {
             colorConsole('收到的数据：' + data + '\n', 'cyan');
             if (data.indexOf('次数过多') !== -1) {
-                return false;
+                return colorConsole('已达到当日请求数上限（50次），请手动刷新 IP\n', 'red');
             }
             var t = data.split(','); // 获取有效信息
             if (t[4] && t[5]) {
@@ -216,75 +226,30 @@ var linkStart = (function (httpReq) {
             httpReq.get('http://www.baidu.com', function (res) {
                 if (res.statusCode !== 200) {
                     colorConsole('网络断开，开始下一组尝试...\n', 'grey');
-                    cb(true);
+                    getOrder();
                 } else {
-                    setTimeout(function () {
-                        checkNet(cb);
-                    }, 10000); // 每十秒检测一次
+                    setTimeout(checkNet, 10000); // 每十秒检测一次
                 }
             });
         };
 
-        var login = function (uname, pwd) {
-            // 登录
-            colorConsole('开始登录...\n', 'yellow');
-
-            var contents = init.loginForm;
-            contents.username = uname;
-            contents.password = pwd;
-
-            contents = querystring.stringify(contents);
-
-            var options = {
-                method: 'POST',
-                host: init.loginHost,
-                path: init.loginPath,
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Content-Length': contents.length
+        var checkLogin = function (uname, pwd, xml) {
+            parseXML(xml, function (err, result) {
+                if (err) {
+                    return colorConsole(err, 'bold');
                 }
-            };
 
+                var loginStatus = result.deepFind('WISPAccessGatewayParam.AuthenticationReply.0.ResponseCode.0');
 
-            var httpsPost = function (opt, contents, cb) {
-                // 发送 https POST 请求
-                var req = https.request(opt, function (res) {
-                    res.setEncoding('utf8');
-                    var data = '';
-                    res.on('data', function (chunk) {
-                        data += chunk;
-                    }).on('end', function () {
-                        cb(res, data);
-                    });
-                });
-
-                req.on('error', function (e) {
-                    colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
-                    reconnect();
-                });
-
-                req.write(contents); // 写入请求内容
-                req.end();
-            };
-
-            httpsPost(options, contents, function (res, data) {
-                data = data.replace(/\s/g, ''); // 去除空格
-
-                if (data.indexOf('("1"=="1")//登录成功' /* 登录成功会返回含有此字符串的网页*/ ) !== -1) {
-
+                if (loginStatus && parseInt(loginStatus) === 50) {
                     colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
 
                     isSecondTry = false; // 重置计数
 
                     setTimeout(function () {
                         colorConsole('开始检查网络连接...\n', 'magenta');
-                        checkNet(function (isOffline) {
-                            if (isOffline) {
-                                getOrder();
-                            }
-                        });
+                        checkNet();
                     }, 480000); // 八分钟触发定时器
-
                 } else {
                     if (isSecondTry) {
                         // 两次登录都失败就放弃吧
@@ -303,27 +268,51 @@ var linkStart = (function (httpReq) {
             });
         };
 
+        var login = function (uname, pwd) {
+            // 登录
+            colorConsole('开始登录...\n', 'yellow');
+
+            var contents = {
+                UserName: uname + '@wlan.sh.chntel.com',
+                Password: pwd
+            };
+
+            contents = querystring.stringify(contents);
+
+            var options = {
+                method: 'POST',
+                host: init.deepFind('loginUrl.host'),
+                path: init.deepFind('loginUrl.path'),
+                headers: {
+                    'User-Agent': 'CDMA+WLAN',
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Content-Length': contents.length
+                }
+            };
+
+            var req = https.request(options, function (res) {
+                res.setEncoding('utf8');
+                var xml = '';
+                res.on('data', function (chunk) {
+                    xml += chunk;
+                }).on('end', function () {
+                    checkLogin(uname, pwd, xml);
+                });
+            });
+
+            req.on('error', function (e) {
+                colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
+            });
+
+            req.write(contents);
+            req.end();
+        };
+
         return login;
     })();
 
     return openReq;
 })(httpReq);
-
-var reconnect = (function (linkStart) {
-    var count = 0;
-
-    var connect = function () {
-        if (count >= 10) {
-            // 十次尝试失败退出进程
-            colorConsole('重连失败，进程即将退出', 'red');
-            process.exit();
-        }
-        setTimeout(linkStart, ++count * 3000);
-        colorConsole(count * 3 + '秒后尝试重连', 'red');
-    };
-
-    return connect;
-})(linkStart);
 
 // 进程会话
 process.on('message', function (curStatus) {

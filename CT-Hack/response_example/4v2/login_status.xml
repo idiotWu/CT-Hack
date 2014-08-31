@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<WISPAccessGatewayParam>
+    <AuthenticationReply>
+        <LoginResultsURL>
+            https://wlan.ct10000.com/portal/loginResult.jsp?UserName=W90016648708@wlan.sh.chntel.com-NasType=Huawei-NasName=BJ-JA-SR-1.M.ME60
+        </LoginResultsURL>
+        <LogoffURL>
+            https://wlan.ct10000.com/portal/wispr.logoff?UserName=W90016648708@wlan.sh.chntel.com-NasType=Huawei-NasName=BJ-JA-SR-1.M.ME60
+        </LogoffURL>
+        <MessageType>120</MessageType>
+        <ResponseCode>50</ResponseCode>
+        <ReplyMessage>Access ACCEPT</ReplyMessage>
+    </AuthenticationReply>
+</WISPAccessGatewayParam>
