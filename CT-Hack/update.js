@@ -1,4 +1,4 @@
-var version = '0.3.1';
+var version = '0.3.5';
 var url = 'https://github.com/idiotWu/CT-Hack/releases';
 var input = process.stdin;
 var output = process.stdout;

@@ -1,7 +1,5 @@
 var input = process.stdin;
 var output = process.stdout;
-input.resume();
-input.setEncoding('utf8');
 
 var http = require('http');
 var https = require('https');
@@ -12,24 +10,8 @@ var colors = require('./node_modules/colors');
 var cheerio = require('./node_modules/cheerio');
 
 var curStatus = {
-    phone: undefined,
     crashed: false,
     loginUrl: null
-};
-
-Object.prototype.deepFind = function (path) {
-    var paths = path.split('.');
-    var result = this;
-
-    for (var i = 0, max = paths.length; i < max; ++i) {
-        if (!result[paths[i]]) {
-            return undefined;
-        } else {
-            result = result[paths[i]];
-        }
-    }
-
-    return result;
 };
 
 var getRedirectUrl = function (cb) {
@@ -95,50 +77,35 @@ var connect = function () {
     }).send(curStatus);
 };
 
-(function () {
-    console.log('/*!\n* ChinaNet Portal Hacking v0.3.1 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Just typing Phone Number in shell to run it;\n* Everything will be done automatically :)\n*/\n'.yellow);
-    console.log('进程守护已启动！\n'.magenta.bold);
+console.log('/*!\n* ChinaNet Portal Hacking v0.3.5 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Everything will be done automatically :)\n*/\n'.yellow);
+console.log('进程守护已启动！\n'.magenta.bold);
 
-    console.log('正在获取网关地址，请稍后...');
+console.log('--> 正在获取网关地址，请稍后...\n'.yellow.bold);
 
-    getLoginUrl(function (url) {
-        if (!url) {
-            return console.log('未能获取到网关地址，请检查网络连接'.red.bold);
+getLoginUrl(function (url) {
+    if (!url) {
+        return console.log('未能获取到网关地址，请检查网络连接\n'.red.bold);
+    }
+    console.log(('获取到的地址：' + url + '\n').cyan.bold);
+    curStatus.loginUrl = parseUrl(url);
+    connect(); // 开始建立子进程
+});
+
+input.resume();
+input.setEncoding('utf8');
+input.on('data', function (text) {
+    text = text.trim();
+    if (curStatus.crashed) {
+        // 进程中断
+        var T = text.toUpperCase();
+        if (T === "Y") {
+            console.log('正在重启主进程...\n'.green.bold);
+            input.pause();
+            return connect(); // 重启进程
+        } else if (T === "N") {
+            process.exit();
+        } else {
+            return output.write('\n是否重启进程（Y/N）：');
         }
-        curStatus.loginUrl = parseUrl(url);
-
-        output.write('\n请输入11位手机号: '.cyan.bold);
-
-        input.on('data', function (text) {
-            text = text.trim();
-            if (curStatus.crashed) {
-                // 进程中断
-                var T = text.toUpperCase();
-                if (T === "Y") {
-                    console.log('正在重启主进程...\n'.green.bold);
-                    input.pause();
-                    return connect(); // 重启进程
-                } else if (T === "N") {
-                    process.exit();
-                } else {
-                    return output.write('\n是否重启进程（Y/N）：');
-                }
-            }
-
-            if (/[^\d]/g.test(text)) {
-                console.log('手机号格式不正确！\n'.red.bold);
-                output.write('请输入11位手机号: '.cyan.bold);
-                return;
-            }
-
-            if (text.length !== 11) {
-                console.log('手机号长度不对！\n'.red.bold);
-                output.write('请输入11位手机号: '.cyan.bold);
-                return;
-            }
-
-            curStatus.phone = parseInt(text, 10); // 存储手机号
-            connect(); // 开始建立子进程
-        });
-    });
-})();
+    }
+});

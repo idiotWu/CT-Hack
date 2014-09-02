@@ -79,18 +79,30 @@ var linkStart = (function (httpReq) {
         loginUrl: null
     };
 
+    var getRandomPhoneNum = function () {
+        // return string phoneNum
+        var phoneNumPrefix = ["135", "136", "137", "138", "139", "147", "150", "151", "152", "157", "158", "159", "182", "183", "184", "187", "188", "130", "131", "132", "155", "156", "185", "186", "133", "153", "180", "181", "189"]; // 有效号段
+        var zeroFill = '00000000';
+        var ramNum = Math.floor(Math.random() * 99999999).toString();
+        var fillLength = 8 - ramNum.length;
+        var numBody = zeroFill.substr(0, fillLength) + ramNum;
+        var prefix = phoneNumPrefix[Math.floor(Math.random() * phoneNumPrefix.length)];
+        return prefix + numBody;
+    };
+
     var openReq = function (curStatus) {
         // 发起请求，得到 cookie
-        colorConsole('\n-->\n开始发起请求', 'yellow');
+        colorConsole('开始模拟购买时长卡\n', 'yellow');
         curStatus = curStatus || init; // 重新发起请求时直接从 init 获取数据
 
-        init.phone = curStatus.phone;
+        init.phone = getRandomPhoneNum();
         init.loginUrl = curStatus.loginUrl;
 
         if (init.cookie) {
             colorConsole('已存在 cookie：' + init.cookie + '\n', 'cyan');
             return addGood(); // 已存在 cookie 则直接进行下一步
         }
+
         httpReq.get('http://wifi.189.cn/service/index.jsp', function (res) {
             var cookie = res['headers']['set-cookie'][0].split(';')[0];
             init.cookie = cookie;
@@ -167,12 +179,13 @@ var linkStart = (function (httpReq) {
                 delete init.cookie;
                 return openReq();
             }
-            // 否则递增电话号码重试
-            colorConsole(data.split(',')[1] + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
+            // 否则生成新的重试
+            colorConsole(data + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
+            init.phone = getRandomPhoneNum(); // 生成新的手机号
             return getOrder();
         });
 
-        process.send(++init.phone); // 为下次计算做准备
+        init.phone++; // 为下次计算做准备
     };
 
     var getPwd = function (orderId) {
@@ -205,9 +218,8 @@ var linkStart = (function (httpReq) {
     var hackLogin = (function () {
         var isSecondTry = false; // 两次尝试计数
 
-        var checkNet = function (cb) {
+        var checkNet = function () {
             // 检测网络是否连接上
-            // callback: boolean isOnline
             httpReq.get('http://www.baidu.com', function (res) {
                 if (res.statusCode !== 200) {
                     colorConsole('网络断开，开始下一组尝试...\n', 'grey');
