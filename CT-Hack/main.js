@@ -83,7 +83,7 @@ var linkStart = (function (httpReq) {
         // return string phoneNum
         var phoneNumPrefix = ["135", "136", "137", "138", "139", "147", "150", "151", "152", "157", "158", "159", "182", "183", "184", "187", "188", "130", "131", "132", "155", "156", "185", "186", "133", "153", "180", "181", "189"]; // 有效号段
         var zeroFill = '00000000';
-        var ramNum = Math.floor(Math.random() * 99999999).toString();
+        var ramNum = Math.floor(Math.random() * 100000000).toString();
         var fillLength = 8 - ramNum.length;
         var numBody = zeroFill.substr(0, fillLength) + ramNum;
         var prefix = phoneNumPrefix[Math.floor(Math.random() * phoneNumPrefix.length)];
@@ -175,12 +175,12 @@ var linkStart = (function (httpReq) {
             }
             if (data.indexOf('购物车为空') !== -1) {
                 // 若没进行购物车添加，则重新发起请求
-                colorConsole('购物车为空，将重置 cookie 后再次尝试！', 'magenta');
+                colorConsole('购物车为空，将重置 cookie 后再次尝试！\n', 'magenta');
                 delete init.cookie;
                 return openReq();
             }
             // 否则生成新的重试
-            colorConsole(data + ' || 没有得到订单号，继续下一组尝试...\n', 'grey');
+            colorConsole(data + ' || 没有得到订单号，将更新手机号后再次尝试！\n', 'grey');
             init.phone = getRandomPhoneNum(); // 生成新的手机号
             return getOrder();
         });

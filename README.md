@@ -28,5 +28,5 @@
 
 ### 版权： ###
 
-北京化工大学-学生网络中心-系统组 @Dolphin,   
+北京化工大学-学生网络中心-系统组 [@Dolphin Wood](http://www.idiotwu.com/),   
 MIT Licensed.
