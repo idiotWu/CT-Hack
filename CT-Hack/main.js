@@ -81,7 +81,7 @@ var linkStart = (function (httpReq) {
 
     var getRandomPhoneNum = function () {
         // return string phoneNum
-        var phoneNumPrefix = ["135", "136", "137", "138", "139", "147", "150", "151", "152", "157", "158", "159", "182", "183", "184", "187", "188", "130", "131", "132", "155", "156", "185", "186", "133", "153", "180", "181", "189"]; // 有效号段
+        var phoneNumPrefix = ['135', '136', '137', '138', '139', '147', '150', '151', '152', '157', '158', '159', '182', '183', '184', '187', '188', '130', '131', '132', '155', '156', '185', '186', '133', '153', '180', '181', '189']; // 有效号段
         var zeroFill = '00000000';
         var ramNum = Math.floor(Math.random() * 100000000).toString();
         var fillLength = 8 - ramNum.length;
@@ -90,7 +90,7 @@ var linkStart = (function (httpReq) {
         return prefix + numBody;
     };
 
-    var openReq = function (curStatus) {
+    var openReq = function ( /* optional */ curStatus) {
         // 发起请求，得到 cookie
         colorConsole('开始模拟购买时长卡\n', 'yellow');
         curStatus = curStatus || init; // 重新发起请求时直接从 init 获取数据
@@ -179,7 +179,7 @@ var linkStart = (function (httpReq) {
                 delete init.cookie;
                 return openReq();
             }
-            // 否则生成新的重试
+            // 否则生成新的手机号重试
             colorConsole(data + ' || 没有得到订单号，将更新手机号后再次尝试！\n', 'grey');
             init.phone = getRandomPhoneNum(); // 生成新的手机号
             return getOrder();
