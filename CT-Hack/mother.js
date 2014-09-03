@@ -1,6 +1,11 @@
 var input = process.stdin;
 var output = process.stdout;
 
+var curStatus = {
+    crashed: false,
+    loginUrl: null
+};
+
 var http = require('http');
 var https = require('https');
 var parseUrl = require('url').parse;
@@ -8,11 +13,6 @@ var child = require('child_process');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
 var cheerio = require('./node_modules/cheerio');
-
-var curStatus = {
-    crashed: false,
-    loginUrl: null
-};
 
 var getRedirectUrl = function (cb) {
     // callback: string redirectUrl
@@ -77,7 +77,7 @@ var connect = function () {
     }).send(curStatus);
 };
 
-console.log('/*!\n* ChinaNet Portal Hacking v0.3.5 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Everything will be done automatically :)\n*/\n'.yellow);
+console.log('/*!\n* ChinaNet Portal Hacking v0.3.6 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Everything will be done automatically :)\n*/\n'.yellow);
 console.log('进程守护已启动！\n'.magenta.bold);
 
 console.log('--> 正在获取网关地址，请稍后...\n'.yellow.bold);
