@@ -167,6 +167,7 @@ var getOrder = function () {
     httpReq.post(options, function (res, data) {
         if (data[0] === '1') {
             // 得到订单号，开始尝试登录
+            init.phone++; // 为下次计算做准备
             var orderId = data.split(',')[1];
             colorConsole('得到的订单号：' + orderId + '\n', 'cyan');
             return getPwd(orderId);
@@ -181,8 +182,6 @@ var getOrder = function () {
         init.phone = getRandomPhoneNum(); // 生成新的手机号
         return getOrder();
     });
-
-    init.phone++; // 为下次计算做准备
 };
 
 var getPwd = function (orderId) {
@@ -190,6 +189,8 @@ var getPwd = function (orderId) {
     colorConsole('开始获取账号密码...\n', 'yellow');
 
     var options = {
+        // 不带 cookie 以便多次获得账号密码
+        // 否则第二次请求密码会返回'-1,很抱歉,您今天只能获取1次10分钟的时长卡!'
         path: '/clientApi.do',
         contents: {
             method: 'get10mCard',
@@ -220,7 +221,7 @@ var checkLogin = (function () {
         httpReq.get('http://www.baidu.com', function (res) {
             if (res.statusCode !== 200) {
                 colorConsole('网络断开，开始下一组尝试...\n', 'grey');
-                getOrder();
+                addGood();
             } else {
                 setTimeout(checkNet, 10000); // 每十秒检测一次
             }
@@ -247,7 +248,7 @@ var checkLogin = (function () {
                 // 两次登录都失败就放弃吧
                 colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
                 isSecondTry = false; // 重置计数
-                getOrder();
+                addGood();
             } else {
                 // 电信渣服务器可能不能即时处理分配到的账号密码
                 colorConsole('登录失败，三秒后再次尝试登录...\n', 'magenta');

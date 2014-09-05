@@ -1,11 +1,3 @@
-var input = process.stdin;
-var output = process.stdout;
-
-var curStatus = {
-    crashed: false,
-    loginUrl: null
-};
-
 var http = require('http');
 var https = require('https');
 var parseUrl = require('url').parse;
@@ -13,6 +5,14 @@ var child = require('child_process');
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
 var cheerio = require('./node_modules/cheerio');
+
+var input = process.stdin;
+var output = process.stdout;
+
+var curStatus = {
+    crashed: false,
+    loginUrl: null
+};
 
 var getRedirectUrl = function (cb) {
     // callback: string redirectUrl
