@@ -47,6 +47,10 @@ var httpReq = (function (querystring, http) {
         });
 
         req.on('error', function (e) {
+            if (e.code === 'ETIMEDOUT') {
+                colorConsole('请求超时\n', 'red');
+                return checkNet();
+            }
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
 
@@ -68,6 +72,10 @@ var httpReq = (function (querystring, http) {
         });
 
         req.on('error', function (e) {
+            if (e.code === 'ETIMEDOUT') {
+                colorConsole('请求超时\n', 'red');
+                return checkNet();
+            }
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     };
@@ -95,11 +103,6 @@ var linkStart = function (curStatus) {
 
     init.phone = getRandomPhoneNum();
     init.loginUrl = curStatus.loginUrl;
-
-    if (init.cookie) {
-        colorConsole('已存在 cookie：' + init.cookie + '\n', 'cyan');
-        return addGood(); // 已存在 cookie 则直接进行下一步
-    }
 
     httpReq.get('http://wifi.189.cn/service/index.jsp', function (res) {
         var cookie = res['headers']['set-cookie'][0].split(';')[0];
@@ -213,55 +216,6 @@ var getPwd = function (orderId) {
     });
 };
 
-var checkLogin = (function () {
-    var isSecondTry = false; // 两次尝试计数
-
-    var checkNet = function () {
-        // 检测网络是否连接上
-        httpReq.get('http://www.baidu.com', function (res) {
-            if (res.statusCode !== 200) {
-                colorConsole('网络断开，开始下一组尝试...\n', 'grey');
-                addGood();
-            } else {
-                setTimeout(checkNet, 10000); // 每十秒检测一次
-            }
-        });
-    };
-
-    var check = function (uname, pwd, xml) {
-        var $ = cheerio.load(xml, {
-            xmlMode: true
-        });
-        var loginStatus = $('ResponseCode').text();
-
-        if (loginStatus && parseInt(loginStatus) === 50) {
-            colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
-
-            isSecondTry = false; // 重置计数
-
-            setTimeout(function () {
-                colorConsole('开始检查网络连接...\n', 'magenta');
-                checkNet();
-            }, 480000); // 八分钟触发定时器
-        } else {
-            if (isSecondTry) {
-                // 两次登录都失败就放弃吧
-                colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
-                isSecondTry = false; // 重置计数
-                addGood();
-            } else {
-                // 电信渣服务器可能不能即时处理分配到的账号密码
-                colorConsole('登录失败，三秒后再次尝试登录...\n', 'magenta');
-                setTimeout(function () {
-                    isSecondTry = true; // 标记第二次尝试
-                    login(uname, pwd);
-                }, 3000);
-            }
-        }
-    };
-    return check;
-})();
-
 var login = function (uname, pwd) {
     // 登录
     colorConsole('开始登录...\n', 'yellow');
@@ -284,22 +238,81 @@ var login = function (uname, pwd) {
         }
     };
 
-    var req = https.request(options, function (res) {
-        res.setEncoding('utf8');
-        var xml = '';
-        res.on('data', function (chunk) {
-            xml += chunk;
-        }).on('end', function () {
-            checkLogin(uname, pwd, xml);
+    var hackLogin = function () {
+        var req = https.request(options, function (res) {
+            res.setEncoding('utf8');
+            var xml = '';
+            res.on('data', function (chunk) {
+                xml += chunk;
+            }).on('end', function () {
+                checkLogin(xml);
+            });
         });
-    });
 
-    req.on('error', function (e) {
-        colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
-    });
+        req.on('error', function (e) {
+            if (e.code === 'ETIMEDOUT') {
+                colorConsole('请求超时\n', 'red');
+                return checkNet();
+            }
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
+        });
 
-    req.write(contents);
-    req.end();
+        req.write(contents);
+        req.end();
+    };
+
+    var checkLogin = (function () {
+        var isSecondTry = false; // 两次尝试计数
+
+        var check = function (xml) {
+            var $ = cheerio.load(xml, {
+                xmlMode: true
+            });
+
+            var loginStatus = $('ResponseCode').text();
+
+            if (loginStatus && parseInt(loginStatus) === 50) {
+                colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
+
+                isSecondTry = false; // 重置计数
+
+                setTimeout(function () {
+                    // 八分钟触发定时器
+                    colorConsole('开始检查网络连接...\n', 'magenta');
+                    checkNet();
+                }, 480000);
+            } else {
+                if (isSecondTry) {
+                    // 两次登录都失败就放弃吧
+                    colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
+                    isSecondTry = false; // 重置计数
+                    addGood(); // 直接从添加商品开始
+                } else {
+                    // 电信渣服务器可能不能即时处理分配到的账号密码
+                    colorConsole('登录失败，一秒后再次尝试登录...\n', 'magenta');
+                    setTimeout(function () {
+                        isSecondTry = true; // 标记第二次尝试
+                        hackLogin();
+                    }, 1000);
+                }
+            }
+        };
+        return check;
+    })();
+
+    hackLogin();
+};
+
+var checkNet = function () {
+    // 检测网络是否连接上
+    httpReq.get('http://www.baidu.com', function (res) {
+        if (res.statusCode !== 200) {
+            colorConsole('网络断开，开始下一组尝试...\n', 'grey');
+            addGood();
+        } else {
+            setTimeout(checkNet, 10000); // 每十秒检测一次
+        }
+    });
 };
 
 // 进程会话

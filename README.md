@@ -19,12 +19,7 @@
 1. 利用每次申请购买时长卡会得到**十分钟**的连接时间，通过 node.js 模拟购买流程，自动获得账号密码。
 2. 利用所得到的帐密，模拟天翼 WiFi 客户端登录过程，达到联网的目的。
 
-![](http://www.processon.com/chart_image/5409f02c0cf2f9980f134dcb.png)
-
-### 已知错误： ###
-
-1. 一定概率重复出现**购物车为空**
-2. 进程**重启后**可能无法请求得到 cookie
+![](http://www.processon.com/chart_image/541405160cf2a74ef4ae09ed.png)
 
 ### 版权： ###
 

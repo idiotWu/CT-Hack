@@ -77,7 +77,7 @@ var connect = function () {
     }).send(curStatus);
 };
 
-console.log('/*!\n* ChinaNet Portal Hacking v0.3.6 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Everything will be done automatically :)\n*/\n'.yellow);
+console.log('/*!\n* ChinaNet Portal Hacking v0.3.7 by Dolphin @BUCT_SNC_SYS.\n* Copyright 2014 Dolphin Wood.\n* Licensed under http://opensource.org/licenses/MIT\n*\n* Designed and built with all the love in the world.\n*\n* Everything will be done automatically :)\n*/\n'.yellow);
 console.log('进程守护已启动！\n'.magenta.bold);
 
 console.log('--> 正在获取网关地址，请稍后...\n'.yellow.bold);
@@ -86,7 +86,7 @@ getLoginUrl(function (url) {
     if (!url) {
         return console.log('未能获取到网关地址，请检查网络连接\n'.red.bold);
     }
-    console.log(('获取到的地址：' + url + '\n').cyan.bold);
+    console.log(('获取到的登录地址：' + url + '\n').cyan.bold);
     curStatus.loginUrl = parseUrl(url);
     connect(); // 开始建立子进程
 });
