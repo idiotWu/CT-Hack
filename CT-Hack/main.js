@@ -274,8 +274,6 @@ var login = function (uname, pwd) {
             if (loginStatus && parseInt(loginStatus) === 50) {
                 colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
 
-                isSecondTry = false; // 重置计数
-
                 setTimeout(function () {
                     // 八分钟触发定时器
                     colorConsole('开始检查网络连接...\n', 'magenta');
@@ -285,7 +283,6 @@ var login = function (uname, pwd) {
                 if (isSecondTry) {
                     // 两次登录都失败就放弃吧
                     colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
-                    isSecondTry = false; // 重置计数
                     addGood(); // 直接从添加商品开始
                 } else {
                     // 电信渣服务器可能不能即时处理分配到的账号密码
