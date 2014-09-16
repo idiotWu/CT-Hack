@@ -1,4 +1,11 @@
-var version = '0.3.7';
+/**
+ * Update Scripts
+ *
+ * @date     2014-09-16 21:33:57
+ * @author   Dolphin<dolphin.w.e@gmail.com>
+ */
+
+var version = '0.4.0';
 var url = 'https://github.com/idiotWu/CT-Hack/releases';
 var input = process.stdin;
 var output = process.stdout;
@@ -9,14 +16,9 @@ var cherrio = require('./node_modules/cheerio');
 
 var isNeedUpdate = function (latest) {
     // 版本号检测
-    var latestV = latest.split('.');
-    var curV = version.split('.');
-    for (var i = 0, max = curV.length; i < max; i++) {
-        if (latestV[i] > curV[i]) {
-            return true;
-        }
-    }
-    return false;
+    var latestV = parseInt(latest.replace(/\./g, ''));
+    var curV = parseInt(version.replace(/\./g, ''));
+    return (latestV > curV);
 };
 
 (function () {
