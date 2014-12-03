@@ -89,14 +89,9 @@ var httpReq = (function (querystring, http) {
 })(querystring, http);
 
 var getRandomPhoneNum = function () {
-    // return string phoneNum
-    var phoneNumPrefix = ['135', '136', '137', '138', '139', '147', '150', '151', '152', '157', '158', '159', '182', '183', '184', '187', '188', '130', '131', '132', '155', '156', '185', '186', '133', '153', '180', '181', '189']; // 有效号段
-    var zeroFill = '00000000';
-    var ramNum = Math.floor(Math.random() * 100000000).toString();
-    var fillLength = 8 - ramNum.length;
-    var numBody = zeroFill.substr(0, fillLength) + ramNum;
-    var prefix = phoneNumPrefix[Math.floor(Math.random() * phoneNumPrefix.length)];
-    return prefix + numBody;
+    // return Number phoneNum
+    var phoneNumPrefix = [135, 136, 137, 138, 139, 147, 150, 151, 152, 157, 158, 159, 182, 183, 184, 187, 188, 130, 131, 132, 155, 156, 185, 186, 133, 153, 180, 181, 189]; // 有效号段
+    return phoneNumPrefix[Math.floor(Math.random() * phoneNumPrefix.length)] * 1e8 + Math.floor(Math.random() * 1e8);
 };
 
 var linkStart = function (curStatus) {
